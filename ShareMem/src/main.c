@@ -413,10 +413,10 @@ void thread_B_code(void *argA , void *argB, void *argC)
         ConfigurePins();
 
 
-        printk("\nBotao1 = %d", botao1);
-        printk(" Botao2 = %d", botao2);
-        printk(" Botao3 = %d", botao3);
-        printk(" Botao4 = %d\n", botao4);
+        printk("\n Botao1 = %d", botao1);
+        printk(" | Botao2 = %d", botao2);
+        printk(" | Botao3 = %d", botao3);
+        printk(" | Botao4 = %d\n", botao4);
         
         if(botao3 == 1 && DadosBC >= 5){
           botao3 = 0;
