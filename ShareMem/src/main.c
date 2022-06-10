@@ -120,9 +120,17 @@ volatile int flag2 = 0;
 #define thread_B_prio 1
 /** Thread scheduling priority */
 #define thread_C_prio 1
+/** Thread scheduling priority */
+#define thread_D_prio 1
+/** Thread scheduling priority */
+#define thread_E_prio 1
+/** Thread scheduling priority */
+#define thread_F_prio 1
 
 /** Therad periodicity (in ms)*/
 #define thread_A_period 100
+/** Therad periodicity (in ms)*/
+#define thread_D_period 1000
 
 /* Global vars */
 struct k_timer my_timer;
@@ -135,26 +143,43 @@ K_THREAD_STACK_DEFINE(thread_A_stack, STACK_SIZE);
 K_THREAD_STACK_DEFINE(thread_B_stack, STACK_SIZE);
 /** Create thread stack space */
 K_THREAD_STACK_DEFINE(thread_C_stack, STACK_SIZE);
+/** Create thread stack space */
+K_THREAD_STACK_DEFINE(thread_D_stack, STACK_SIZE);
+/** Create thread stack space */
+K_THREAD_STACK_DEFINE(thread_E_stack, STACK_SIZE);
+/** Create thread stack space */
+K_THREAD_STACK_DEFINE(thread_F_stack, STACK_SIZE);
 
 /* Create variables for thread data */
 struct k_thread thread_A_data;
 struct k_thread thread_B_data;
 struct k_thread thread_C_data;
+struct k_thread thread_D_data;
+struct k_thread thread_E_data;
+struct k_thread thread_F_data;
+
 
 /* Create task IDs */
 k_tid_t thread_A_tid;
 k_tid_t thread_B_tid;
 k_tid_t thread_C_tid;
+k_tid_t thread_D_tid;
+k_tid_t thread_E_tid;
+k_tid_t thread_F_tid;
+
 
 /* Global vars (shared memory between tasks A/B and B/C, resp) */
-int DadosAB[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+int DadosDE[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 int DadosBC = 0;
-int ab = 100;
-int bc = 200;
+int DadosEF = 0;
 
 /* Semaphores for task synch */
 struct k_sem sem_ab;
 struct k_sem sem_bc;
+struct k_sem sem_ad;
+struct k_sem sem_de;
+struct k_sem sem_ef;
+
 
 /** Takes one sample */
 static int adc_sample(void)
@@ -308,6 +333,10 @@ void ConfigurePins() {
 void thread_A_code(void *argA, void *argB, void *argC);
 void thread_B_code(void *argA, void *argB, void *argC);
 void thread_C_code(void *argA, void *argB, void *argC);
+void thread_D_code(void *argA, void *argB, void *argC);
+void thread_E_code(void *argA, void *argB, void *argC);
+void thread_F_code(void *argA, void *argB, void *argC);
+
 
 /** Main function */
 void main(void) {
@@ -330,6 +359,9 @@ void main(void) {
     /* Create and init semaphores */
     k_sem_init(&sem_ab, 0, 1);
     k_sem_init(&sem_bc, 0, 1);
+    k_sem_init(&sem_ad, 0, 1);
+    k_sem_init(&sem_de, 0, 1);
+    k_sem_init(&sem_ef, 0, 1);
     
     /* Create tasks */
     thread_A_tid = k_thread_create(&thread_A_data, thread_A_stack,
@@ -343,6 +375,18 @@ void main(void) {
     thread_C_tid = k_thread_create(&thread_C_data, thread_C_stack,
         K_THREAD_STACK_SIZEOF(thread_C_stack), thread_C_code,
         NULL, NULL, NULL, thread_C_prio, 0, K_NO_WAIT);
+
+    thread_D_tid = k_thread_create(&thread_D_data, thread_D_stack,
+        K_THREAD_STACK_SIZEOF(thread_D_stack), thread_D_code,
+        NULL, NULL, NULL, thread_D_prio, 0, K_NO_WAIT);
+    
+    thread_E_tid = k_thread_create(&thread_E_data, thread_E_stack,
+        K_THREAD_STACK_SIZEOF(thread_E_stack), thread_E_code,
+        NULL, NULL, NULL, thread_E_prio, 0, K_NO_WAIT);
+
+    thread_F_tid = k_thread_create(&thread_F_data, thread_F_stack,
+        K_THREAD_STACK_SIZEOF(thread_F_stack), thread_F_code,
+        NULL, NULL, NULL, thread_F_prio, 0, K_NO_WAIT);
 
     return;
 } 
@@ -375,7 +419,6 @@ void thread_A_code(void *argA , void *argB, void *argC)
           botao2 = 0;
           flag1 = 0;
           flag2 = 1;
-          //k_sem_give(&sem_ad);
         }
         
         if(flag1 == 1){
@@ -384,7 +427,7 @@ void thread_A_code(void *argA , void *argB, void *argC)
         }
         if(flag2 == 1){
           printk("Automatico %d %d\n", flag1, flag2);
-          //k_sem_give(&sem_ad);
+          k_sem_give(&sem_ad);
         }
 
         botao1 = 0;
@@ -468,3 +511,99 @@ void thread_C_code(void *argA , void *argB, void *argC)
     }
 }
 
+void thread_D_code(void *argA , void *argB, void *argC)
+{
+    /* Other variables */
+    long int nact = 0;
+    int err = 0;
+
+    /* Thread loop */
+    while(1) {
+        k_sem_take(&sem_ad,  K_FOREVER);
+
+        printk("Leitura 10 amostras (Thread D)\n");
+
+        for(int i = 0; i < 10; i++){
+          err=adc_sample();
+          if(err) {
+            printk("adc_sample() failed with error code %d\n\r",err);
+          }
+          else {
+            if(adc_sample_buffer[0] > 1023) {
+                printk("adc reading out of range\n\r");
+                adc_sample_buffer[0] = 0;
+            }
+          }
+          DadosDE[i] = adc_sample_buffer[0];
+          printk("%d ", DadosDE[i]); 
+        }
+        k_sem_give(&sem_de);
+    }
+}
+
+void thread_E_code(void *argA , void *argB, void *argC)
+{
+    long int nact = 0;
+
+    while(1) {
+        k_sem_take(&sem_de,  K_FOREVER);
+
+        int avg = 0;
+        int cnt = 0;
+        int avgmax = 0;
+        int avgmin = 0;
+        int sum = 0;
+
+        printk("\nCalculo do valor final (Thread E)\n");
+        for(int i = 0; i < 10; i++){
+          avg += DadosDE[i];
+        }
+        avg = avg/10;
+
+        avgmax = avg + avg*0.1;
+        avgmin = avg - avg*0.1;
+
+        for(int i = 0; i < 10; i++){
+          if(DadosDE[i] < avgmax || DadosDE[i] > avgmin) {
+            sum += DadosDE[i];
+            cnt++;
+          }
+        }
+
+        DadosEF = sum/cnt;
+        
+        k_sem_give(&sem_ef);
+    }
+}
+
+void thread_F_code(void *argA , void *argB, void *argC)
+{
+    /* Other variables */
+    const struct device *pwm0_dev;          /* Pointer to PWM device structure */
+    int pwm0_channel  = 13;                 /* Ouput pin associated to pwm channel. See DTS for pwm channel - output pin association */
+     
+    unsigned int pwmPeriod_us = 1000;       /* PWM period in us */
+    int ret = 0;
+    long int nact = 0;
+
+    pwm0_dev = device_get_binding(DT_LABEL(PWM0_NID));
+    if (pwm0_dev == NULL) {
+	printk("Error: PWM device %s is not ready\n", pwm0_dev->name);
+	return;
+    }
+    else  {
+        printk("PWM device %s is ready\n", pwm0_dev->name);            
+    }
+
+    while(1) {
+        k_sem_take(&sem_ef, K_FOREVER);
+
+        printk("Atribuir valor a LED: %d (Thread F)\n", DadosEF);
+
+        ret = pwm_pin_set_usec(pwm0_dev, pwm0_channel, pwmPeriod_us,(unsigned int)((pwmPeriod_us*DadosEF)/1023), PWM_POLARITY_NORMAL);
+        if (ret) {
+          printk("Error %d: failed to set pulse width\n", ret);
+          return;
+        }    
+    }
+}
