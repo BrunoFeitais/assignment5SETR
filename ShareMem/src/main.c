@@ -171,6 +171,7 @@ k_tid_t thread_F_tid;
 /* Global vars (shared memory between tasks A/B and B/C, resp) */
 int DadosDE[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 int DadosBC = 0;
+int DadosBC2 = 100;
 int DadosEF = 0;
 
 /* Semaphores for task synch */
@@ -456,19 +457,21 @@ void thread_B_code(void *argA , void *argB, void *argC)
         ConfigurePins();
 
 
-        printk("\n Botao1 = %d", botao1);
+        /* printk("\n Botao1 = %d", botao1);
         printk(" | Botao2 = %d", botao2);
         printk(" | Botao3 = %d", botao3);
-        printk(" | Botao4 = %d\n", botao4);
+        printk(" | Botao4 = %d\n", botao4); */
         
         if(botao3 == 1 && DadosBC >= 5){
           botao3 = 0;
           DadosBC = DadosBC - 5;
+          DadosBC2 = DadosBC2 + 5;
         }
 
         if(botao4 == 1 && DadosBC <= 95){
           botao4 = 0;
           DadosBC += 5;
+          DadosBC2 = DadosBC2 - 5;
         }
         
         botao3 = 0;
@@ -501,7 +504,7 @@ void thread_C_code(void *argA , void *argB, void *argC)
     while(1) {
         k_sem_take(&sem_bc, K_FOREVER);
 
-        printk("Atribuir valor a LED: %d (Thread C)\n", DadosBC);
+        printk("Atribuir valor a LED: %d (Thread C)\n", DadosBC2);
 
         ret = pwm_pin_set_usec(pwm0_dev, pwm0_channel, pwmPeriod_us,(unsigned int)((pwmPeriod_us*DadosBC)/100), PWM_POLARITY_NORMAL);
         if (ret) {
