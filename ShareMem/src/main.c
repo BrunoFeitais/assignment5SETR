@@ -1,13 +1,26 @@
 /** @main main.c
- * @brief This program implements cooperative tasks in Zephyr. 
+ * @brief This program implements an application that controls the light intensity of the region. 
  *
  * 
- * It does a basic processing of an analog signal using shared
- * memory + Smaphores.
+ * It has 2 modes: 
+ *  - Manual mode: The user can decide the light intensity with the buttons
+ *  - Automatic mode: The user choses the desire light intensity and the program will make the intesity always the same.
+ * 
+ * On manual mode:
+ *  - But1: Manual mode chosen.
+ *  - But2: Autumatic mode chosen.
+ *  - But3: Decrease led light intensity
+ *  - But4: Increase led light intensity
+ *
+ * On automatic mode:
+ *  - But1: Manual mode chosen.
+ *  - But2: Autumatic mode chosen.
+ *  - But3: Decrease region light intensity
+ *  - But4: Increase region light intensity
  *
  * @author Bruno Feitais
- * @date 2022/05
- * @bug There are no bugs
+ * @date 2022/06
+ * @bug There are no bugs.
  */
 
 #include <zephyr.h>
@@ -126,6 +139,8 @@ volatile int flag2 = 0;
 #define thread_E_prio 1
 /** Thread scheduling priority */
 #define thread_F_prio 1
+/** Thread scheduling priority */
+#define thread_G_prio 1
 
 /** Therad periodicity (in ms)*/
 #define thread_A_period 100
@@ -149,6 +164,8 @@ K_THREAD_STACK_DEFINE(thread_D_stack, STACK_SIZE);
 K_THREAD_STACK_DEFINE(thread_E_stack, STACK_SIZE);
 /** Create thread stack space */
 K_THREAD_STACK_DEFINE(thread_F_stack, STACK_SIZE);
+/** Create thread stack space */
+K_THREAD_STACK_DEFINE(thread_G_stack, STACK_SIZE);
 
 /* Create variables for thread data */
 struct k_thread thread_A_data;
@@ -157,6 +174,7 @@ struct k_thread thread_C_data;
 struct k_thread thread_D_data;
 struct k_thread thread_E_data;
 struct k_thread thread_F_data;
+struct k_thread thread_G_data;
 
 
 /* Create task IDs */
@@ -166,20 +184,40 @@ k_tid_t thread_C_tid;
 k_tid_t thread_D_tid;
 k_tid_t thread_E_tid;
 k_tid_t thread_F_tid;
+k_tid_t thread_G_tid;
 
 
-/* Global vars (shared memory between tasks A/B and B/C, resp) */
+/** Shared memory between Thread D and E*/
 int DadosDE[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+/** Shared memory between Thread B and C*/
 int DadosBC = 0;
+/** Shared memory between Thread B and C*/
 int DadosBC2 = 100;
+/** Shared memory between Thread E and F*/
 int DadosEF = 0;
+/** Shared memory between Thread F and G*/
+int DadosF  = 0;
+/** Shared memory between Thread F and G*/
+int DadosF2 = 100;
+/** Shared memory between Thread F and G*/
+int DadosF1023 = 0;
+/** Shared memory between Thread F and G*/
+int DadosFG = 0;
+/** Shared memory between Thread F and G*/
+int DadosFG2 = 1023;
 
-/* Semaphores for task synch */
+/** Semaphores for task synch */
 struct k_sem sem_ab;
+/** Semaphores for task synch */
 struct k_sem sem_bc;
+/** Semaphores for task synch */
 struct k_sem sem_ad;
+/** Semaphores for task synch */
 struct k_sem sem_de;
+/** Semaphores for task synch */
 struct k_sem sem_ef;
+/** Semaphores for task synch */
+struct k_sem sem_fg;
 
 
 /** Takes one sample */
@@ -205,7 +243,12 @@ static int adc_sample(void)
 
 	return ret;
 }
-
+/**
+ * Function but1press_cbfunction
+ *
+ * This function detects if the button was pressed and it prints in the terminal if the button was pressed.
+ * It also has a flag that becomes 1 if the button is pressed.
+ */
 void but1press_cbfunction(const struct device *dev, struct gpio_callback *cb, uint32_t pins){
     
     // Inform that button was hit
@@ -215,7 +258,7 @@ void but1press_cbfunction(const struct device *dev, struct gpio_callback *cb, ui
     botao1 = 1;
 }
 /**
- * Function butxpress_cbfunction
+ * Function but2press_cbfunction
  *
  * This function detects if the button was pressed and it prints in the terminal if the button was pressed.
  * It also has a flag that becomes 1 if the button is pressed.
@@ -229,7 +272,7 @@ void but2press_cbfunction(const struct device *dev, struct gpio_callback *cb, ui
     botao2 = 1;
 }
 /**
- * Function butxpress_cbfunction
+ * Function but3press_cbfunction
  *
  * This function detects if the button was pressed and it prints in the terminal if the button was pressed.
  * It also has a flag that becomes 1 if the button is pressed.
@@ -243,7 +286,7 @@ void but3press_cbfunction(const struct device *dev, struct gpio_callback *cb, ui
     botao3 = 1;
 }
 /**
- * Function butxpress_cbfunction
+ * Function but4press_cbfunction
  *
  * This function detects if the button was pressed and it prints in the terminal if the button was pressed.
  * It also has a flag that becomes 1 if the button is pressed.
@@ -257,6 +300,12 @@ void but4press_cbfunction(const struct device *dev, struct gpio_callback *cb, ui
     botao4 = 1;
 }
 
+/**
+ * Function ConfigurePins
+ *
+ * This function configure and iniatialize all the pins that are used in this
+ * project.
+ */
 void ConfigurePins() {
     // Local vars
     const struct device *gpio0_dev;     // Pointer to GPIO device structure 
@@ -330,13 +379,14 @@ void ConfigurePins() {
     return;
 }
 
-/* Thread code prototypes */
+/** Thread code prototypes */
 void thread_A_code(void *argA, void *argB, void *argC);
 void thread_B_code(void *argA, void *argB, void *argC);
 void thread_C_code(void *argA, void *argB, void *argC);
 void thread_D_code(void *argA, void *argB, void *argC);
 void thread_E_code(void *argA, void *argB, void *argC);
 void thread_F_code(void *argA, void *argB, void *argC);
+void thread_G_code(void *argA, void *argB, void *argC);
 
 
 /** Main function */
@@ -363,6 +413,7 @@ void main(void) {
     k_sem_init(&sem_ad, 0, 1);
     k_sem_init(&sem_de, 0, 1);
     k_sem_init(&sem_ef, 0, 1);
+    k_sem_init(&sem_fg, 0, 1);
     
     /* Create tasks */
     thread_A_tid = k_thread_create(&thread_A_data, thread_A_stack,
@@ -389,11 +440,15 @@ void main(void) {
         K_THREAD_STACK_SIZEOF(thread_F_stack), thread_F_code,
         NULL, NULL, NULL, thread_F_prio, 0, K_NO_WAIT);
 
+    thread_G_tid = k_thread_create(&thread_G_data, thread_G_stack,
+        K_THREAD_STACK_SIZEOF(thread_G_stack), thread_G_code,
+        NULL, NULL, NULL, thread_G_prio, 0, K_NO_WAIT);
+
     return;
 } 
 
 /** Thread A code implementation. 
- * It reads 10 ADC values and saves it on the shared memory. */
+ * Where is choosen if it is on automatic or manual mode. */
 void thread_A_code(void *argA , void *argB, void *argC)
 {
     /* Timing variables to control task periodicity */
@@ -444,7 +499,7 @@ void thread_A_code(void *argA , void *argB, void *argC)
 }
 
 /** Thread B code implementation. 
- * It gets the 10 ADC values, does the average and saves it on the shared memory. */
+ * Lets the user increase the LED intensity. */
 void thread_B_code(void *argA , void *argB, void *argC)
 {
     /* Other variables */
@@ -481,7 +536,7 @@ void thread_B_code(void *argA , void *argB, void *argC)
 }
 
 /** Thread C code implementation. 
- * It reads the average and implements it on the LED 1. */
+ * It gets the average and implements it on the LED 1. */
 void thread_C_code(void *argA , void *argB, void *argC)
 {
     /* Other variables */
@@ -514,6 +569,8 @@ void thread_C_code(void *argA , void *argB, void *argC)
     }
 }
 
+/** Thread D code implementation. 
+ * It reads 10 ADC values and saves it on the shared memory. */
 void thread_D_code(void *argA , void *argB, void *argC)
 {
     /* Other variables */
@@ -544,6 +601,8 @@ void thread_D_code(void *argA , void *argB, void *argC)
     }
 }
 
+/** Thread E code implementation. 
+ * It gets the 10 ADC values, does the average and saves it on the shared memory. */
 void thread_E_code(void *argA , void *argB, void *argC)
 {
     long int nact = 0;
@@ -557,7 +616,6 @@ void thread_E_code(void *argA , void *argB, void *argC)
         int avgmin = 0;
         int sum = 0;
 
-        printk("\nCalculo do valor final (Thread E)\n");
         for(int i = 0; i < 10; i++){
           avg += DadosDE[i];
         }
@@ -574,12 +632,62 @@ void thread_E_code(void *argA , void *argB, void *argC)
         }
 
         DadosEF = sum/cnt;
+
+        printk("\nCalculo do valor lido pelo sensor: %d (Thread E)\n", DadosEF);
         
         k_sem_give(&sem_ef);
     }
 }
 
+/** Thread F code implementation. 
+ * Lets the user chose how much light intesity wants.
+ * After that compares the real light intesity (Thread E) with the wanted from the user and adjusts it by changing the light intesity of the led.
+ * 
+ * It has a margin error of 5%. */
 void thread_F_code(void *argA , void *argB, void *argC)
+{
+    while(1) {
+        k_sem_take(&sem_ef, K_FOREVER);
+
+        ConfigurePins();
+        
+        if(botao3 == 1 && DadosF >= 5){
+          botao3 = 0;
+          botao4 = 0;
+          DadosF = DadosF - 5;
+          DadosF2 = DadosF2 + 5;
+        }
+
+        if(botao4 == 1 && DadosF <= 95){
+          botao4 = 0;
+          botao3 = 0;
+          DadosF += 5;
+          DadosF2 = DadosF2 - 5;
+        }
+
+        printk("Intensidade luz selecionada: %d (Thread F)\n", DadosF2);
+        
+        DadosF1023 = DadosF2*1023/100;
+
+        if((DadosEF < 0.95*DadosF1023) && (DadosFG >= 973)){
+          DadosFG -= 50;
+          DadosFG2 += 50;
+          printk("Aumentar intesidade da LED: %d\n", DadosFG2);
+        }  
+        
+        if((DadosEF > 1.05*DadosF1023) && (DadosFG <= 50)){
+          DadosFG += 50;
+          DadosFG2 -= 50;
+          printk("Diminuir intesidade da LED: %d\n", DadosFG2);
+        }  
+        
+        k_sem_give(&sem_fg); 
+    }
+}
+
+/** Thread G code implementation. 
+ * It gets DadosFG and implements it on the LED. */
+void thread_G_code(void *argA , void *argB, void *argC)
 {
     /* Other variables */
     const struct device *pwm0_dev;          /* Pointer to PWM device structure */
@@ -599,11 +707,11 @@ void thread_F_code(void *argA , void *argB, void *argC)
     }
 
     while(1) {
-        k_sem_take(&sem_ef, K_FOREVER);
+        k_sem_take(&sem_fg, K_FOREVER);
 
-        printk("Atribuir valor a LED: %d (Thread F)\n", DadosEF);
+        printk("Atribuir valor a LED: %d (Thread G)\n", DadosFG2);
 
-        ret = pwm_pin_set_usec(pwm0_dev, pwm0_channel, pwmPeriod_us,(unsigned int)((pwmPeriod_us*DadosEF)/1023), PWM_POLARITY_NORMAL);
+        ret = pwm_pin_set_usec(pwm0_dev, pwm0_channel, pwmPeriod_us,(unsigned int)((pwmPeriod_us*DadosFG)/1023), PWM_POLARITY_NORMAL);
         if (ret) {
           printk("Error %d: failed to set pulse width\n", ret);
           return;

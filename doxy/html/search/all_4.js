@@ -1,4 +1,5 @@
 var searchData=
 [
-  ['gpio0_5fnid_0',['GPIO0_NID',['../fifo_2src_2main_8c.html#a4c0e6f34369bef1deb3a9efae6ac14fb',1,'GPIO0_NID():&#160;main.c'],['../_share_mem_2src_2main_8c.html#a4c0e6f34369bef1deb3a9efae6ac14fb',1,'GPIO0_NID():&#160;main.c']]]
+  ['flag1_0',['flag1',['../main_8c.html#ab13ee975201261f9c2a2a61652653647',1,'main.c']]],
+  ['flag2_1',['flag2',['../main_8c.html#aeaec577a45a60c5a5d99ea4d44898075',1,'main.c']]]
 ];
