@@ -665,21 +665,21 @@ void thread_F_code(void *argA , void *argB, void *argC)
           DadosF2 = DadosF2 - 5;
         }
 
-        printk("Intensidade luz selecionada: %d (Thread F)\n", DadosF2);
+        printk("Intensidade luz selecionada: %d % (Thread F)\n", DadosF2);
         
         DadosF1023 = DadosF2*1023/100;
 
-        if((DadosEF < 0.95*DadosF1023) && (DadosFG >= 973)){
-          DadosFG -= 50;
-          DadosFG2 += 50;
-          printk("Aumentar intesidade da LED: %d\n", DadosFG2);
-        }  
+        if((DadosEF < 0.95*DadosF1023) && (DadosFG2 <= 1017)){
+          DadosFG -= 5;
+          DadosFG2 += 5;
+          printk("AUMENTAR intesidade da LED: %d\n", DadosFG2);
+        } 
         
-        if((DadosEF > 1.05*DadosF1023) && (DadosFG <= 50)){
-          DadosFG += 50;
-          DadosFG2 -= 50;
-          printk("Diminuir intesidade da LED: %d\n", DadosFG2);
-        }  
+        if((DadosEF > 1.05*DadosF1023) && (DadosFG2 >= 5)){
+          DadosFG += 5;
+          DadosFG2 -= 5;
+          printk("DIMINUIR intesidade da LED: %d\n", DadosFG2);
+        } 
         
         k_sem_give(&sem_fg); 
     }
